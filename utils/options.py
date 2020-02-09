@@ -11,7 +11,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    '--data_set',
+    '--dataset',
     type=str,
     default='cifar10',
     help='Select dataset to train. default:cifar10',
@@ -89,33 +89,18 @@ parser.add_argument(
     default=5e-4,
     help='The weight decay of loss. default:5e-4')
 
-## Sketch
 parser.add_argument(
-    '--start_conv',
-    type=int,
-    default=1,
-    help='The index of Conv to start sketch, index starts from 0. default:1'
-)
-
-parser.add_argument(
-    '--sketch_rate',
-    type=str,
-    default=None,
-    help='The proportion of each layer reserved after sketching convolution layer sketch. default:None'
-)
-
-parser.add_argument(
-    '--sketch_model',
+    '--pretrain_model',
     type=str,
     default=None,
     help='Path to the model wait for sketch/test. default:None'
 )
 
 parser.add_argument(
-    '--weight_norm_method',
+    '--init_method',
     type=str,
-    default=None,
-    help='Select the weight norm method. default:None Optional:l2'
+    default='centroids',
+    help='Initital method of pruned model. default:centroids. optimal:random,centroids,other'
 )
 
 args = parser.parse_args()

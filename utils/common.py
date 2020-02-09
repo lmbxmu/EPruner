@@ -90,7 +90,7 @@ def accuracy(output, target, topk=(1,)):
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
 
-def get_sketch_rate(sketch_rate):
+def get_prune_rate(sketch_rate):
     import re
 
     cprate_str = sketch_rate
