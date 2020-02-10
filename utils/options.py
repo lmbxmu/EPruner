@@ -1,6 +1,6 @@
 import argparse
 
-parser = argparse.ArgumentParser(description='Filter Sketch')
+parser = argparse.ArgumentParser(description='APPruner')
 
 parser.add_argument(
     '--gpus',
@@ -93,7 +93,7 @@ parser.add_argument(
     '--pretrain_model',
     type=str,
     default=None,
-    help='Path to the model wait for sketch/test. default:None'
+    help='Path to the pretrain model . default:None'
 )
 
 parser.add_argument(
