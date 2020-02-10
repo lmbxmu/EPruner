@@ -25,7 +25,7 @@ python appruner.py
 --dataset cifar10 
 --data_path ../data/cifar10/
 --pretrain_model ./experiment/pretrain/resne56.pt 
---job_dir ./experiment/resnet56/sketch/
+--job_dir ./experiment/resnet56/
 --arch resnet 
 --cfg resnet56 
 --init_method centroids
