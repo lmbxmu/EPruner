@@ -55,7 +55,6 @@ def direct_project(weight, indices):
 
     return A
 
-
 def get_flops_params(orimodel, prunemodel):
     input = torch.randn(1, 3, 32, 32).to(device)
 
@@ -97,7 +96,6 @@ def cluster_resnet():
 
             conv1_weight = module.conv1.weight.data
             _, centroids, indices = cluster_weight(conv1_weight)
-            print(indices)
             cfg.append(len(centroids))
             centroids_state_dict[name + '.conv1.weight'] = centroids
             if args.init_method == 'random_project':
@@ -133,35 +131,53 @@ def cluster_vgg():
     if args.pretrain_model is None or not os.path.exists(args.pretrain_model):
         raise ('pretrain model path should be exist!')
     ckpt = torch.load(args.pretrain_model, map_location=device)
-    origin_model = import_module(f'model.{args.arch}_cifar').resnet(args.cfg).to(device)
+    origin_model = import_module(f'model.{args.arch}_cifar').VGG(args.cfg).to(device)
     origin_model.load_state_dict(ckpt['state_dict'])
 
     cfg = []
     centroids_state_dict = {}
     prune_state_dict = []
+    indices = []
 
     for name, module in origin_model.named_modules():
 
         if isinstance(module, nn.Conv2d):
 
-            conv1_weight = module.weight.data
-            grp, centroids = cluster_weight(conv1_weight)
+            conv_weight = module.weight.data
+            _, centroids, indice = cluster_weight(conv_weight)
             cfg.append(len(centroids))
-            centroids_state_dict[name + '.weight'] = centroids
-            centroids_state_dict[name + '.conv2.weight'] = random_project(module.conv2.weight.data, len(centroids))
-            prune_state_dict.append(name + '.bn1.weight')
-            prune_state_dict.append(name + '.bn1.bias')
-            prune_state_dict.append(name + '.bn1.running_var')
-            prune_state_dict.append(name + '.bn1.running_mean')
+            indices.append(indice)
+            # indices[name + '.weight'] = indice
+            centroids_state_dict[name + '.weight'] = centroids.reshape((-1, conv_weight.size(1), conv_weight.size(2), conv_weight.size(3)))
+            prune_state_dict.append(name + '.bias')
 
-    model = import_module(f'model.{args.arch}').resnet(args.cfg, cfg).to(device)
-    # get_flops_params(origin_model, model)
-    if args.init_method == 'other':
-        pass
-    elif args.init_method == 'centroids':
+        elif isinstance(module, nn.BatchNorm2d):
+            prune_state_dict.append(name + '.weight')
+            prune_state_dict.append(name + '.bias')
+            prune_state_dict.append(name + '.running_var')
+            prune_state_dict.append(name + '.running_mean')
+
+        elif isinstance(module, nn.Linear):
+            prune_state_dict.append(name + '.weight')
+            prune_state_dict.append(name + '.bias')
+
+    model = import_module(f'model.{args.arch}_cifar').VGG(args.cfg, layer_cfg=cfg).to(device)
+    get_flops_params(origin_model, model)
+
+    if args.init_method == 'random_project' or args.init_method == 'centroids':
         pretrain_state_dict = origin_model.state_dict()
         state_dict = model.state_dict()
         centroids_state_dict_keys = list(centroids_state_dict.keys())
+
+        for i, (k, v) in enumerate(centroids_state_dict.items()):
+            if i == 0: #first conv need not to prune channel
+                continue
+            if args.init_method == 'random_project':
+                centroids_state_dict[k] = random_project(torch.FloatTensor(centroids_state_dict[k]),
+                                                         len(indices[i - 1]))
+            else:
+                centroids_state_dict[k] = direct_project(torch.FloatTensor(centroids_state_dict[k]), indices[i - 1])
+
         for k, v in state_dict.items():
             if k in prune_state_dict:
                 continue
@@ -267,6 +283,8 @@ def main():
     print('==> Building model..')
     if args.arch == 'resnet':
         model, cfg = cluster_resnet()
+    elif args.arch == 'vgg':
+        model, cfg = cluster_vgg()
     else:
         raise('arch not exist!')
     print('==>Search Done!')
