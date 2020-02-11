@@ -70,7 +70,7 @@ optional arguments:
                         Path to the pretrain model . default:None
   --init_method INIT_METHOD
                         Initital method of pruned model. default:centroids.
-                        optimal:random,centroids,other
+                        optimal:random,centroids,random_project
   --preference_beta PREFERENCE_BETA
                         The coefficient of preference used in
                         AffinityPropagation cluster. default:0.45
