@@ -52,7 +52,6 @@ def cluster_resnet():
             prune_state_dict.append(name + '.bn1.running_mean')
 
     model = import_module(f'model.{args.arch}_cifar').resnet(args.cfg, layer_cfg=cfg).to(device)
-    # get_flops_params(origin_model, model, logger)
     if args.init_method == 'random_project' or args.init_method == 'centroids':
         pretrain_state_dict = origin_model.state_dict()
         state_dict = model.state_dict()
@@ -90,7 +89,6 @@ def cluster_vgg():
             _, centroids, indice = cluster_weight(conv_weight)
             cfg.append(len(centroids))
             indices.append(indice)
-            # indices[name + '.weight'] = indice
             centroids_state_dict[name + '.weight'] = centroids.reshape((-1, conv_weight.size(1), conv_weight.size(2), conv_weight.size(3)))
             prune_state_dict.append(name + '.bias')
 
@@ -105,7 +103,6 @@ def cluster_vgg():
             prune_state_dict.append(name + '.bias')
 
     model = import_module(f'model.{args.arch}_cifar').VGG(args.cfg, layer_cfg=cfg).to(device)
-    # get_flops_params(origin_model, model, logger)
 
     if args.init_method == 'random_project' or args.init_method == 'centroids':
         pretrain_state_dict = origin_model.state_dict()
@@ -194,7 +191,7 @@ def cluster_googlenet():
             prune_state_dict.append(name + '.branch5x5.4.running_mean')
 
     model = import_module(f'model.{args.arch}').googlenet(layer_cfg=cfg).to(device)
-    # get_flops_params(origin_model, model, logger)
+
     if args.init_method == 'random_project' or args.init_method == 'centroids':
         pretrain_state_dict = origin_model.state_dict()
         state_dict = model.state_dict()
