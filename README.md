@@ -1,4 +1,3 @@
-# KPruner
 # Pre-trained Models
 
 We provide the pre-trained models used in our paper.
@@ -15,6 +14,8 @@ We provide the pre-trained models used in our paper.
 
 The code has been tested using Pytorch1.3 and CUDA10.0 on Ubuntu16.04.
 
+sklearn 0.20.1
+
 
 ## APPruner
 
@@ -29,6 +30,7 @@ python appruner.py
 --arch resnet 
 --cfg resnet56 
 --init_method centroids
+--preference_beta 0.45
 --lr 0.01
 --lr_decay_step 50 100
 --num_epochs 150 
@@ -69,6 +71,9 @@ optional arguments:
   --init_method INIT_METHOD
                         Initital method of pruned model. default:centroids.
                         optimal:random,centroids,other
+  --preference_beta PREFERENCE_BETA
+                        The coefficient of preference used in
+                        AffinityPropagation cluster. default:0.45
 ```
 
 ## Tips
