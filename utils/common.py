@@ -2,11 +2,17 @@ from __future__ import absolute_import
 import datetime
 import shutil
 from pathlib import Path
-import os
-
-import torch
 import logging
+import torch
+from .options import args
+import numpy as np
 
+import os
+from sklearn.cluster import AffinityPropagation
+from sklearn.cluster.affinity_propagation_ import euclidean_distances
+from sklearn.random_projection import SparseRandomProjection
+
+device = torch.device(f"cuda:{args.gpus[0]}") if torch.cuda.is_available() else 'cpu'
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -109,3 +115,35 @@ def get_prune_rate(sketch_rate):
         cprate += [float(find_cprate[0])] * num
 
     return cprate
+
+
+def cluster_weight(weight):
+
+    A = weight.cpu().clone()
+    if weight.dim() == 4:  #Convolution layer
+        A = A.view(A.size(0), -1)
+    else:
+        raise('The weight dim must be 4!!!')
+
+    affinity_matrix = -euclidean_distances(A, squared=True)
+    preference = np.median(affinity_matrix, axis=0) * args.preference_beta
+    cluster = AffinityPropagation(preference=preference)
+    cluster.fit(A)
+    return cluster.labels_, cluster.cluster_centers_, cluster.cluster_centers_indices_
+
+def random_project(weight, channel_num):
+
+    A = weight.cpu().clone()
+    A = A.view(A.size(0), -1)
+    rp = SparseRandomProjection(n_components=channel_num * weight.size(2) * weight.size(3))
+    rp.fit(A)
+    return rp.transform(A)
+
+def direct_project(weight, indices):
+
+    A = torch.randn(weight.size(0), len(indices), weight.size(2), weight.size(3))
+    for i, indice in enumerate(indices):
+
+        A[:, i, :, :] = weight[:, indice, :, :]
+
+    return A

@@ -4,16 +4,12 @@ import torch.optim as optim
 from utils.options import args
 from model.resnet_cifar import ResBasicBlock
 import utils.common as utils
-import numpy as np
-from thop import profile
 
 import os
 import time
 from data import cifar10
 from importlib import import_module
-from sklearn.cluster import AffinityPropagation
-from sklearn.cluster.affinity_propagation_ import euclidean_distances
-from sklearn.random_projection import SparseRandomProjection
+from utils.common import cluster_weight, random_project, direct_project
 
 device = torch.device(f"cuda:{args.gpus[0]}") if torch.cuda.is_available() else 'cpu'
 checkpoint = utils.checkpoint(args)
@@ -23,60 +19,6 @@ loss_func = nn.CrossEntropyLoss()
 # Data
 print('==> Preparing data..')
 loader = cifar10.Data(args)
-
-def cluster_weight(weight):
-
-    A = weight.cpu().clone()
-    if weight.dim() == 4:  #Convolution layer
-        A = A.view(A.size(0), -1)
-    else:
-        raise('The weight dim must be 4!!!')
-
-    affinity_matrix = -euclidean_distances(A, squared=True)
-    preference = np.median(affinity_matrix, axis=0) * args.preference_beta
-    cluster = AffinityPropagation(preference=preference)
-    cluster.fit(A)
-    return cluster.labels_, cluster.cluster_centers_, cluster.cluster_centers_indices_
-
-def random_project(weight, channel_num):
-
-    A = weight.cpu().clone()
-    A = A.view(A.size(0), -1)
-    rp = SparseRandomProjection(n_components=channel_num * weight.size(2) * weight.size(3))
-    rp.fit(A)
-    return rp.transform(A)
-
-def direct_project(weight, indices):
-
-    A = torch.randn(weight.size(0), len(indices), weight.size(2), weight.size(3))
-    for i, indice in enumerate(indices):
-
-        A[:, i, :, :] = weight[:, indice, :, :]
-
-    return A
-
-def get_flops_params(orimodel, prunemodel):
-    input = torch.randn(1, 3, 32, 32).to(device)
-
-    print('--------------UnPruned Model--------------')
-    oriflops, oriparams = profile(orimodel, inputs=(input,))
-    print('Params: %.2f' % (oriparams))
-    print('FLOPS: %.2f' % (oriflops))
-
-    print('--------------Pruned Model--------------')
-    print('model\'s cfg', prunemodel.layer_cfg)
-    oricfg = []
-    oricfg.extend([16] * 9)
-    oricfg.extend([32] * 9)
-    oricfg.extend([64] * 9)
-    print(oricfg)
-    flops, params = profile(prunemodel, inputs=(input,))
-    print('Params: %.2f' % (params))
-    print('FLOPS: %.2f' % (flops))
-
-    print('--------------Retention Ratio--------------')
-    print('Params Retention Ratio: %d/%d (%.2f%%)' % (params, oriparams, 100. * params / oriparams))
-    print('FLOPS Retention Ratio: %d/%d (%.2f%%)' % (flops, oriflops, 100. * flops / oriflops))
 
 def cluster_resnet():
 
@@ -109,7 +51,7 @@ def cluster_resnet():
             prune_state_dict.append(name + '.bn1.running_mean')
 
     model = import_module(f'model.{args.arch}_cifar').resnet(args.cfg, layer_cfg=cfg).to(device)
-    get_flops_params(origin_model, model)
+    # get_flops_params(origin_model, model, logger)
     if args.init_method == 'random_project' or args.init_method == 'centroids':
         pretrain_state_dict = origin_model.state_dict()
         state_dict = model.state_dict()
@@ -162,7 +104,7 @@ def cluster_vgg():
             prune_state_dict.append(name + '.bias')
 
     model = import_module(f'model.{args.arch}_cifar').VGG(args.cfg, layer_cfg=cfg).to(device)
-    get_flops_params(origin_model, model)
+    # get_flops_params(origin_model, model, logger)
 
     if args.init_method == 'random_project' or args.init_method == 'centroids':
         pretrain_state_dict = origin_model.state_dict()
