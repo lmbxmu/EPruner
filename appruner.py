@@ -104,6 +104,7 @@ def cluster_resnet():
                 centroids_state_dict[name + '.conv2.weight'] = random_project(module.conv2.weight.data, len(centroids))
             else:
                 centroids_state_dict[name + '.conv2.weight'] = direct_project(module.conv2.weight.data, indices)
+
             prune_state_dict.append(name + '.bn1.weight')
             prune_state_dict.append(name + '.bn1.bias')
             prune_state_dict.append(name + '.bn1.running_var')
