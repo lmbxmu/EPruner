@@ -4,7 +4,7 @@ We provide the pre-trained models used in our paper.
 
 ## CIFAR-10
 
-| [ResNet56](https://drive.google.com/open?id=1pt-LgK3kI_4ViXIQWuOP0qmmQa3p2qW5) | [ResNet110](https://drive.google.com/open?id=1Uqg8_J-q2hcsmYTAlRtknCSrkXDqYDMD) |[GoogLeNet](https://drive.google.com/open?id=1YNno621EuTQTVY2cElf8YEue9J4W5BEd) | 
+| [VGG16]( https://drive.google.com/open?id=1pz-_0CCdL-1psIQ545uJ3xT6S_AAnqet) | [ResNet56](https://drive.google.com/open?id=1pt-LgK3kI_4ViXIQWuOP0qmmQa3p2qW5) | [ResNet110](https://drive.google.com/open?id=1Uqg8_J-q2hcsmYTAlRtknCSrkXDqYDMD) |[GoogLeNet](https://drive.google.com/open?id=1YNno621EuTQTVY2cElf8YEue9J4W5BEd) | 
 
 ## ImageNet
 
@@ -14,12 +14,12 @@ We provide the pre-trained models used in our paper.
 
 The code has been tested using Pytorch1.3 and CUDA10.0 on Ubuntu16.04.
 
-sklearn 0.20.1
+Sklearn 0.20.1
 
 
 ## APPruner
 
-You can run the following code to search model on Cifar-10:
+You can run the following code to search model on CIFAR-10:
 
 ```shell
 python appruner.py 
