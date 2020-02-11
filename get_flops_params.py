@@ -1,0 +1,185 @@
+import torch
+import torch.nn as nn
+from utils.options import args
+from model.resnet_cifar import ResBasicBlock
+import utils.common as utils
+
+import os
+from thop import profile
+from data import cifar10
+from importlib import import_module
+from utils.common import cluster_weight, random_project, direct_project
+
+device = torch.device(f"cuda:{args.gpus[0]}") if torch.cuda.is_available() else 'cpu'
+
+def cluster_resnet():
+
+    if args.pretrain_model is None or not os.path.exists(args.pretrain_model):
+        raise ('pretrain model path should be exist!')
+    ckpt = torch.load(args.pretrain_model, map_location=device)
+    origin_model = import_module(f'model.{args.arch}_cifar').resnet(args.cfg).to(device)
+    origin_model.load_state_dict(ckpt['state_dict'])
+
+    cfg = []
+    centroids_state_dict = {}
+    prune_state_dict = []
+
+    for name, module in origin_model.named_modules():
+
+        if isinstance(module, ResBasicBlock):
+
+            conv1_weight = module.conv1.weight.data
+            _, centroids, indices = cluster_weight(conv1_weight)
+            cfg.append(len(centroids))
+            centroids_state_dict[name + '.conv1.weight'] = centroids
+            if args.init_method == 'random_project':
+                centroids_state_dict[name + '.conv2.weight'] = random_project(module.conv2.weight.data, len(centroids))
+            else:
+                centroids_state_dict[name + '.conv2.weight'] = direct_project(module.conv2.weight.data, indices)
+
+            prune_state_dict.append(name + '.bn1.weight')
+            prune_state_dict.append(name + '.bn1.bias')
+            prune_state_dict.append(name + '.bn1.running_var')
+            prune_state_dict.append(name + '.bn1.running_mean')
+
+    model = import_module(f'model.{args.arch}_cifar').resnet(args.cfg, layer_cfg=cfg).to(device)
+    get_flops_params(origin_model, model)
+    if args.init_method == 'random_project' or args.init_method == 'centroids':
+        pretrain_state_dict = origin_model.state_dict()
+        state_dict = model.state_dict()
+        centroids_state_dict_keys = list(centroids_state_dict.keys())
+        for k, v in state_dict.items():
+            if k in prune_state_dict:
+                continue
+            elif k in centroids_state_dict_keys:
+                state_dict[k] = torch.FloatTensor(centroids_state_dict[k]).view_as(state_dict[k])
+            else:
+                state_dict[k] = pretrain_state_dict[k]
+        model.load_state_dict(state_dict)
+    else:
+        pass
+    return model, cfg
+
+def cluster_vgg():
+
+    if args.pretrain_model is None or not os.path.exists(args.pretrain_model):
+        raise ('pretrain model path should be exist!')
+    ckpt = torch.load(args.pretrain_model, map_location=device)
+    origin_model = import_module(f'model.{args.arch}_cifar').VGG(args.cfg).to(device)
+    origin_model.load_state_dict(ckpt['state_dict'])
+
+    cfg = []
+    centroids_state_dict = {}
+    prune_state_dict = []
+    indices = []
+
+    for name, module in origin_model.named_modules():
+
+        if isinstance(module, nn.Conv2d):
+
+            conv_weight = module.weight.data
+            _, centroids, indice = cluster_weight(conv_weight)
+            cfg.append(len(centroids))
+            indices.append(indice)
+            # indices[name + '.weight'] = indice
+            centroids_state_dict[name + '.weight'] = centroids.reshape((-1, conv_weight.size(1), conv_weight.size(2), conv_weight.size(3)))
+            prune_state_dict.append(name + '.bias')
+
+        elif isinstance(module, nn.BatchNorm2d):
+            prune_state_dict.append(name + '.weight')
+            prune_state_dict.append(name + '.bias')
+            prune_state_dict.append(name + '.running_var')
+            prune_state_dict.append(name + '.running_mean')
+
+        elif isinstance(module, nn.Linear):
+            prune_state_dict.append(name + '.weight')
+            prune_state_dict.append(name + '.bias')
+
+    model = import_module(f'model.{args.arch}_cifar').VGG(args.cfg, layer_cfg=cfg).to(device)
+    get_flops_params(origin_model, model)
+
+    if args.init_method == 'random_project' or args.init_method == 'centroids':
+        pretrain_state_dict = origin_model.state_dict()
+        state_dict = model.state_dict()
+        centroids_state_dict_keys = list(centroids_state_dict.keys())
+
+        for i, (k, v) in enumerate(centroids_state_dict.items()):
+            if i == 0: #first conv need not to prune channel
+                continue
+            if args.init_method == 'random_project':
+                centroids_state_dict[k] = random_project(torch.FloatTensor(centroids_state_dict[k]),
+                                                         len(indices[i - 1]))
+            else:
+                centroids_state_dict[k] = direct_project(torch.FloatTensor(centroids_state_dict[k]), indices[i - 1])
+
+        for k, v in state_dict.items():
+            if k in prune_state_dict:
+                continue
+            elif k in centroids_state_dict_keys:
+                state_dict[k] = torch.FloatTensor(centroids_state_dict[k]).view_as(state_dict[k])
+            else:
+                state_dict[k] = pretrain_state_dict[k]
+        model.load_state_dict(state_dict)
+    else:
+        pass
+    return model, cfg
+
+def get_flops_params(orimodel, prunemodel):
+    ori_cfgs = {
+        'vgg16': [64, 64, 128, 128, 256, 256, 256, 512, 512, 512, 512, 512, 512],
+        'resnet56': [16] * 9 + [32] * 9 + [64] * 9,
+        'resnet110': [16] * 18 + [32] * 18 + [64] * 18,
+    }
+
+    input = torch.randn(1, 3, 32, 32).to(device)
+
+    print('--------------UnPruned Model--------------')
+    oriflops, oriparams = profile(orimodel, inputs=(input,))
+    print('Params: %.2f' % (oriparams))
+    print('FLOPS: %.2f' % (oriflops))
+
+    print('--------------Pruned Model--------------')
+    flops, params = profile(prunemodel, inputs=(input,))
+    print('Params: %.2f' % (params))
+    print('FLOPS: %.2f' % (flops))
+
+    print('\n')
+    layer_cfg = ''
+    for i in range(len(prunemodel.layer_cfg)):
+        layer_cfg = layer_cfg + str(prunemodel.layer_cfg[i]) + ' '
+    print('Pruned model\'s cfg: ' + layer_cfg)
+
+    ori_cfg = ''
+    for i in range(len(ori_cfgs[args.cfg])):
+        ori_cfg = ori_cfg + str(ori_cfgs[args.cfg][i]) + ' '
+    print('Unpruned model\'s cfg: ' + ori_cfg)
+    print('--------------Retention Ratio--------------')
+    channel_retention = ''
+    for i in range(len(prunemodel.layer_cfg)):
+        channel_retention = channel_retention + str(prunemodel.layer_cfg[i] / ori_cfgs[args.cfg][i]) + ' '
+    print('Channel Retentio Ratio: '+ channel_retention)
+    print('Params Retention Ratio: %d/%d (%.2f%%)' % (params, oriparams, 100. * params / oriparams))
+    print('FLOPS Retention Ratio: %d/%d (%.2f%%)' % (flops, oriflops, 100. * flops / oriflops))
+
+    print('--------------Prune Ratio--------------')
+    channel_prune = ''
+    for i in range(len(prunemodel.layer_cfg)):
+        channel_prune = channel_prune + str(1 - prunemodel.layer_cfg[i] / ori_cfgs[args.cfg][i]) + ' '
+    print('Channel Prune Ratio:' + channel_prune)
+    print('Params Prune Ratio: %d/%d (%.2f%%)' % (oriparams - params, oriparams, 100.0 * (1.0 - params / oriparams)))
+    print('FLOPS Prune Ratio: %d/%d (%.2f%%)' % (oriflops - flops, oriflops, 100. * (1.0 - flops / oriflops)))
+
+def main():
+
+    # Model
+    print('==> Building model..')
+    if args.arch == 'resnet':
+        model, cfg = cluster_resnet()
+    elif args.arch == 'vgg':
+        model, cfg = cluster_vgg()
+    else:
+        raise('arch not exist!')
+    print('==>Search Done!')
+
+if __name__ == '__main__':
+    main()
