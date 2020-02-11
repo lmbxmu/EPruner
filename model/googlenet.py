@@ -2,9 +2,8 @@ import torch
 import torch.nn as nn
 
 class Inception(nn.Module):
-    def __init__(self, in_planes, n1x1, n3x3red, n3x3, n5x5red, n5x5, pool_planes, sketch_rate, tmp_name):
+    def __init__(self, in_planes, n1x1, n3x3red, n3x3, n5x5red1, n5x5red2, n5x5, pool_planes, tmp_name):
         super(Inception, self).__init__()
-        self.sketch_rate = sketch_rate
         self.tmp_name=tmp_name
 
         self.n1x1 = n1x1
@@ -25,14 +24,14 @@ class Inception(nn.Module):
 
         # 1x1 conv -> 3x3 conv branch
         if self.n3x3:
-            conv3x3_1=nn.Conv2d(in_planes, int(n3x3red * self.sketch_rate), kernel_size=1)
-            conv3x3_2=nn.Conv2d(int(n3x3red * self.sketch_rate), n3x3, kernel_size=3, padding=1)
+            conv3x3_1=nn.Conv2d(in_planes, n3x3red, kernel_size=1)
+            conv3x3_2=nn.Conv2d(n3x3red, n3x3, kernel_size=3, padding=1)
             conv3x3_1.tmp_name = self.tmp_name
             conv3x3_2.tmp_name = self.tmp_name
 
             self.branch3x3 = nn.Sequential(
                 conv3x3_1,
-                nn.BatchNorm2d(int(n3x3red * self.sketch_rate)),
+                nn.BatchNorm2d(n3x3red),
                 nn.ReLU(True),
                 conv3x3_2,
                 nn.BatchNorm2d(n3x3),
@@ -41,19 +40,19 @@ class Inception(nn.Module):
 
         # 1x1 conv -> 5x5 conv branch
         if self.n5x5 > 0:
-            conv5x5_1 = nn.Conv2d(in_planes, int(n5x5red * self.sketch_rate), kernel_size=1)
-            conv5x5_2 = nn.Conv2d(int(n5x5red * self.sketch_rate), int(n5x5 * self.sketch_rate), kernel_size=3, padding=1)
-            conv5x5_3 = nn.Conv2d(int(n5x5 * self.sketch_rate), n5x5, kernel_size=3, padding=1)
+            conv5x5_1 = nn.Conv2d(in_planes, n5x5red1, kernel_size=1)
+            conv5x5_2 = nn.Conv2d(n5x5red1, n5x5red2, kernel_size=3, padding=1)
+            conv5x5_3 = nn.Conv2d(n5x5red2, n5x5, kernel_size=3, padding=1)
             conv5x5_1.tmp_name = self.tmp_name
             conv5x5_2.tmp_name = self.tmp_name
             conv5x5_3.tmp_name = self.tmp_name
 
             self.branch5x5 = nn.Sequential(
                 conv5x5_1,
-                nn.BatchNorm2d(int(n5x5red * self.sketch_rate)),
+                nn.BatchNorm2d(n5x5red1),
                 nn.ReLU(True),
                 conv5x5_2,
-                nn.BatchNorm2d(int(n5x5 * self.sketch_rate)),
+                nn.BatchNorm2d(n5x5red2),
                 nn.ReLU(True),
                 conv5x5_3,
                 nn.BatchNorm2d(n5x5),
@@ -89,13 +88,10 @@ class Inception(nn.Module):
 
 
 class GoogLeNet(nn.Module):
-    def __init__(self, block=Inception, filters=None, sketch_rate=None):
+    def __init__(self, block=Inception, filters=None, layer_cfg=None):
         super(GoogLeNet, self).__init__()
 
-        if sketch_rate is None:
-            self.sketch_rate = [1] * 9
-        else:
-            self.sketch_rate = sketch_rate
+        self.layer_cfg = layer_cfg
 
         conv_pre = nn.Conv2d(3, 192, kernel_size=3, padding=1)
         conv_pre.tmp_name='pre_layer'
@@ -119,20 +115,92 @@ class GoogLeNet(nn.Module):
 
         self.filters=filters
 
-        self.inception_a3 = block(192, filters[0][0],  96, filters[0][1], 16, filters[0][2], filters[0][3], self.sketch_rate[0], 'a3')
-        self.inception_b3 = block(sum(filters[0]), filters[1][0], 128, filters[1][1], 32, filters[1][2], filters[1][3], self.sketch_rate[1], 'a4')
+        self.inception_a3 = block(in_planes=192,
+                                  n1x1=filters[0][0],
+                                  n3x3red=96 if self.layer_cfg is None else self.layer_cfg[0],
+                                  n3x3=filters[0][1],
+                                  n5x5red1=16 if self.layer_cfg is None else self.layer_cfg[1],
+                                  n5x5red2=filters[0][2] if self.layer_cfg is None else self.layer_cfg[2],
+                                  n5x5=filters[0][2],
+                                  pool_planes=filters[0][3],
+                                  tmp_name='a3')
+        self.inception_b3 = block(in_planes=sum(filters[0]),
+                                  n1x1=filters[1][0],
+                                  n3x3red=128 if self.layer_cfg is None else self.layer_cfg[3],
+                                  n3x3=filters[1][1],
+                                  n5x5red1=32 if self.layer_cfg is None else self.layer_cfg[4],
+                                  n5x5red2=filters[1][2] if self.layer_cfg is None else self.layer_cfg[5],
+                                  n5x5=filters[1][2],
+                                  pool_planes=filters[1][3],
+                                  tmp_name='b3')
 
         self.maxpool1 = nn.MaxPool2d(3, stride=2, padding=1)
         self.maxpool2 = nn.MaxPool2d(3, stride=2, padding=1)
 
-        self.inception_a4 = block(sum(filters[1]), filters[2][0],  96, filters[2][1], 16, filters[2][2], filters[2][3], self.sketch_rate[2], 'a4')
-        self.inception_b4 = block(sum(filters[2]), filters[3][0], 112, filters[3][1], 24, filters[3][2], filters[3][3], self.sketch_rate[3], 'b4')
-        self.inception_c4 = block(sum(filters[3]), filters[4][0], 128, filters[4][1], 24, filters[4][2], filters[4][3], self.sketch_rate[4], 'c4')
-        self.inception_d4 = block(sum(filters[4]), filters[5][0], 144, filters[5][1], 32, filters[5][2], filters[5][3], self.sketch_rate[5], 'd4')
-        self.inception_e4 = block(sum(filters[5]), filters[6][0], 160, filters[6][1], 32, filters[6][2], filters[6][3], self.sketch_rate[6], 'e4')
+        self.inception_a4 = block(in_planes=sum(filters[1]),
+                                  n1x1=filters[2][0],
+                                  n3x3red=96 if self.layer_cfg is None else self.layer_cfg[6],
+                                  n3x3=filters[2][1],
+                                  n5x5red1=16 if self.layer_cfg is None else self.layer_cfg[7],
+                                  n5x5red2=filters[2][2] if self.layer_cfg is None else self.layer_cfg[8],
+                                  n5x5=filters[2][2],
+                                  pool_planes=filters[2][3],
+                                  tmp_name='a4')
+        self.inception_b4 = block(in_planes=sum(filters[2]),
+                                  n1x1=filters[3][0],
+                                  n3x3red=112 if self.layer_cfg is None else self.layer_cfg[9],
+                                  n3x3=filters[3][1],
+                                  n5x5red1=24 if self.layer_cfg is None else self.layer_cfg[10],
+                                  n5x5red2=filters[3][2] if self.layer_cfg is None else self.layer_cfg[11],
+                                  n5x5=filters[3][2],
+                                  pool_planes=filters[3][3],
+                                  tmp_name='b4')
+        self.inception_c4 = block(in_planes=sum(filters[3]),
+                                  n1x1=filters[4][0],
+                                  n3x3red=128 if self.layer_cfg is None else self.layer_cfg[12],
+                                  n3x3=filters[4][1],
+                                  n5x5red1=24 if self.layer_cfg is None else self.layer_cfg[13],
+                                  n5x5red2=filters[4][2] if self.layer_cfg is None else self.layer_cfg[14],
+                                  n5x5=filters[4][2],
+                                  pool_planes=filters[4][3],
+                                  tmp_name='c4')
+        self.inception_d4 = block(in_planes=sum(filters[4]),
+                                  n1x1=filters[5][0],
+                                  n3x3red=144 if self.layer_cfg is None else self.layer_cfg[15],
+                                  n3x3=filters[5][1],
+                                  n5x5red1=32 if self.layer_cfg is None else self.layer_cfg[16],
+                                  n5x5red2=filters[5][2] if self.layer_cfg is None else self.layer_cfg[17],
+                                  n5x5=filters[5][2],
+                                  pool_planes=filters[5][3],
+                                  tmp_name='d4')
+        self.inception_e4 = block(in_planes=sum(filters[5]),
+                                  n1x1=filters[6][0],
+                                  n3x3red=160 if self.layer_cfg is None else self.layer_cfg[18],
+                                  n3x3=filters[6][1],
+                                  n5x5red1=32 if self.layer_cfg is None else self.layer_cfg[19],
+                                  n5x5red2=filters[6][2] if self.layer_cfg is None else self.layer_cfg[20],
+                                  n5x5=filters[6][2],
+                                  pool_planes=filters[6][3],
+                                  tmp_name='e4')
 
-        self.inception_a5 = block(sum(filters[6]), filters[7][0], 160, filters[7][1], 32, filters[7][2], filters[7][3], self.sketch_rate[7], 'a5')
-        self.inception_b5 = block(sum(filters[7]), filters[8][0], 192, filters[8][1], 48, filters[8][2], filters[8][3], self.sketch_rate[8], 'b5')
+        self.inception_a5 = block(in_planes=sum(filters[6]),
+                                  n1x1=filters[7][0],
+                                  n3x3red=160 if self.layer_cfg is None else self.layer_cfg[21],
+                                  n3x3=filters[7][1],
+                                  n5x5red1=32 if self.layer_cfg is None else self.layer_cfg[22],
+                                  n5x5red2=filters[7][2] if self.layer_cfg is None else self.layer_cfg[23],
+                                  n5x5=filters[7][2],
+                                  pool_planes=filters[7][3],
+                                  tmp_name='a5')
+        self.inception_b5 = block(in_planes=sum(filters[7]),
+                                  n1x1=filters[8][0],
+                                  n3x3red=192 if self.layer_cfg is None else self.layer_cfg[24],
+                                  n3x3=filters[8][1],
+                                  n5x5red1=48 if self.layer_cfg is None else self.layer_cfg[25],
+                                  n5x5red2=filters[8][2] if self.layer_cfg is None else self.layer_cfg[26],
+                                  n5x5=filters[8][2],
+                                  pool_planes=filters[8][3],
+                                  tmp_name='b5')
 
         self.avgpool = nn.AvgPool2d(8, stride=1)
         self.linear = nn.Linear(sum(filters[-1]), 10)
@@ -178,5 +246,17 @@ class GoogLeNet(nn.Module):
 
         return out
 
-def googlenet(sketch_rate=None):
-    return GoogLeNet(block=Inception, sketch_rate=sketch_rate)
+def googlenet(layer_cfg=None):
+    return GoogLeNet(block=Inception, layer_cfg=layer_cfg)
+
+def test():
+
+
+    model = googlenet()
+    ckpt = torch.load('../pretrain/googlenet.pt', map_location='cpu')
+    model.load_state_dict(ckpt['state_dict'])
+
+    print(model)
+    # print(model(torch.randn(1, 3, 32, 32)))
+
+# test()

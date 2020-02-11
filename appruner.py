@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from utils.options import args
 from model.resnet_cifar import ResBasicBlock
+from model.googlenet import Inception
 import utils.common as utils
 
 import os
@@ -132,6 +133,96 @@ def cluster_vgg():
         pass
     return model, cfg
 
+def cluster_googlenet():
+
+    if args.pretrain_model is None or not os.path.exists(args.pretrain_model):
+        raise ('pretrain model path should be exist!')
+    ckpt = torch.load(args.pretrain_model, map_location=device)
+    origin_model = import_module(f'model.{args.arch}').googlenet().to(device)
+    origin_model.load_state_dict(ckpt['state_dict'])
+
+    cfg = []
+    centroids_state_dict = {}
+    prune_state_dict = []
+    indices = []
+
+    for name, module in origin_model.named_modules():
+
+        if isinstance(module, Inception):
+
+            branch3_weight = module.branch3x3[0].weight.data
+            _, centroids, indice = cluster_weight(branch3_weight)
+            cfg.append(len(centroids))
+            centroids_state_dict[name + '.branch3x3.0.weight'] = centroids
+            if args.init_method == 'random_project':
+                centroids_state_dict[name + '.branch3x3.3.weight'] = random_project(module.branch3x3[3].weight.data, len(centroids))
+            else:
+                centroids_state_dict[name + '.branch3x3.3.weight'] = direct_project(module.branch3x3[3].weight.data, indice)
+
+            prune_state_dict.append(name + '.branch3x3.0.bias')
+            prune_state_dict.append(name + '.branch3x3.1.weight')
+            prune_state_dict.append(name + '.branch3x3.1.bias')
+            prune_state_dict.append(name + '.branch3x3.1.running_var')
+            prune_state_dict.append(name + '.branch3x3.1.running_mean')
+
+            branch5_weight1 = module.branch5x5[0].weight.data
+            _, centroids, indice = cluster_weight(branch5_weight1)
+            cfg.append(len(centroids))
+            indices.append(indice)
+            centroids_state_dict[name + '.branch5x5.0.weight'] = centroids
+
+            prune_state_dict.append(name + '.branch5x5.0.bias')
+            prune_state_dict.append(name + '.branch5x5.1.weight')
+            prune_state_dict.append(name + '.branch5x5.1.bias')
+            prune_state_dict.append(name + '.branch5x5.1.running_var')
+            prune_state_dict.append(name + '.branch5x5.1.running_mean')
+
+            branch5_weight2 = module.branch5x5[3].weight.data
+            _, centroids, indice = cluster_weight(branch5_weight2)
+            cfg.append(len(centroids))
+            centroids_state_dict[name + '.branch5x5.3.weight'] = centroids.reshape((-1, branch5_weight2.size(1), branch5_weight2.size(2), branch5_weight2.size(3)))
+
+            if args.init_method == 'random_project':
+                centroids_state_dict[name + '.branch5x5.6.weight'] = random_project(module.branch5x5[6].weight.data, len(centroids))
+            else:
+                centroids_state_dict[name + '.branch5x5.6.weight'] = direct_project(module.branch5x5[6].weight.data, indice)
+
+            prune_state_dict.append(name + '.branch5x5.3.bias')
+            prune_state_dict.append(name + '.branch5x5.4.weight')
+            prune_state_dict.append(name + '.branch5x5.4.bias')
+            prune_state_dict.append(name + '.branch5x5.4.running_var')
+            prune_state_dict.append(name + '.branch5x5.4.running_mean')
+
+    model = import_module(f'model.{args.arch}').googlenet(layer_cfg=cfg).to(device)
+    # get_flops_params(origin_model, model, logger)
+    if args.init_method == 'random_project' or args.init_method == 'centroids':
+        pretrain_state_dict = origin_model.state_dict()
+        state_dict = model.state_dict()
+        centroids_state_dict_keys = list(centroids_state_dict.keys())
+
+        index = 0
+        for k, v in centroids_state_dict.items():
+
+            if k.endswith('.branch5x5.3.weight'):
+                if args.init_method == 'random_project':
+                    centroids_state_dict[k] = random_project(torch.FloatTensor(centroids_state_dict[k]),
+                                                             len(indices[index]))
+                else:
+                    centroids_state_dict[k] = direct_project(torch.FloatTensor(centroids_state_dict[k]), indices[index])
+                index += 1
+
+        for k, v in state_dict.items():
+            if k in prune_state_dict:
+                continue
+            elif k in centroids_state_dict_keys:
+                state_dict[k] = torch.FloatTensor(centroids_state_dict[k]).view_as(state_dict[k])
+            else:
+                state_dict[k] = pretrain_state_dict[k]
+        model.load_state_dict(state_dict)
+    else:
+        pass
+    return model, cfg
+
 def train(model, optimizer, trainLoader, args, epoch, topk=(1,)):
 
     model.train()
@@ -227,6 +318,8 @@ def main():
         model, cfg = cluster_resnet()
     elif args.arch == 'vgg':
         model, cfg = cluster_vgg()
+    elif args.arch == 'googlenet':
+        model, cfg = cluster_googlenet()
     else:
         raise('arch not exist!')
     print('==>Search Done!')
