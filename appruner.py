@@ -46,6 +46,16 @@ def random_project(weight, channel_num):
     rp.fit(A)
     return rp.transform(A)
 
+def direct_project(weight, indices):
+
+    A = torch.randn(weight.size(0), len(indices), weight.size(2), weight.size(3))
+    for i, indice in enumerate(indices):
+
+        A[:, i, :, :] = weight[:, indice, :, :]
+
+    return A
+
+
 def get_flops_params(orimodel, prunemodel):
     input = torch.randn(1, 3, 32, 32).to(device)
 
@@ -87,9 +97,13 @@ def cluster_resnet():
 
             conv1_weight = module.conv1.weight.data
             _, centroids, indices = cluster_weight(conv1_weight)
+            print(indices)
             cfg.append(len(centroids))
             centroids_state_dict[name + '.conv1.weight'] = centroids
-            centroids_state_dict[name + '.conv2.weight'] = random_project(module.conv2.weight.data, len(centroids))
+            if args.init_method == 'random_project':
+                centroids_state_dict[name + '.conv2.weight'] = random_project(module.conv2.weight.data, len(centroids))
+            else:
+                centroids_state_dict[name + '.conv2.weight'] = direct_project(module.conv2.weight.data, indices)
             prune_state_dict.append(name + '.bn1.weight')
             prune_state_dict.append(name + '.bn1.bias')
             prune_state_dict.append(name + '.bn1.running_var')
@@ -97,9 +111,7 @@ def cluster_resnet():
 
     model = import_module(f'model.{args.arch}_cifar').resnet(args.cfg, layer_cfg=cfg).to(device)
     get_flops_params(origin_model, model)
-    if args.init_method == 'other':
-        pass
-    elif args.init_method == 'centroids':
+    if args.init_method == 'random_project' or args.init_method == 'centroids':
         pretrain_state_dict = origin_model.state_dict()
         state_dict = model.state_dict()
         centroids_state_dict_keys = list(centroids_state_dict.keys())

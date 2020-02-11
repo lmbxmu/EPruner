@@ -100,7 +100,7 @@ parser.add_argument(
     '--init_method',
     type=str,
     default='centroids',
-    help='Initital method of pruned model. default:centroids. optimal:random,centroids,other'
+    help='Initital method of pruned model. default:centroids. optimal:random,centroids,random_project'
 )
 
 parser.add_argument(
