@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from utils.options import args
-from model.resnet import ResBasicBlock
+from model.resnet_cifar import ResBasicBlock
 import utils.common as utils
 import numpy as np
 from thop import profile
@@ -33,10 +33,10 @@ def cluster_weight(weight):
         raise('The weight dim must be 4!!!')
 
     affinity_matrix = -euclidean_distances(A, squared=True)
-    preference = np.min(affinity_matrix, axis=0)
+    preference = np.median(affinity_matrix, axis=0) * args.preference_beta
     cluster = AffinityPropagation(preference=preference)
     cluster.fit(A)
-    return cluster.labels_, cluster.cluster_centers_
+    return cluster.labels_, cluster.cluster_centers_, cluster.cluster_centers_indices_
 
 def random_project(weight, channel_num):
 
@@ -55,9 +55,9 @@ def get_flops_params(orimodel, prunemodel):
     print('FLOPS: %.2f' % (oriflops))
 
     print('--------------Pruned Model--------------')
-    print('model\'s cfg', prunemodel.cfg)
+    print('model\'s cfg', prunemodel.layer_cfg)
     oricfg = []
-    oricfg.extend([16]*9)
+    oricfg.extend([16] * 9)
     oricfg.extend([32] * 9)
     oricfg.extend([64] * 9)
     print(oricfg)
@@ -70,14 +70,11 @@ def get_flops_params(orimodel, prunemodel):
     print('FLOPS Retention Ratio: %d/%d (%.2f%%)' % (flops, oriflops, 100. * flops / oriflops))
 
 def cluster_resnet():
-    # cfg = {'resnet56': [9, 9, 9],
-    #        'resnet110': [18, 18, 18],
-    #        }
 
     if args.pretrain_model is None or not os.path.exists(args.pretrain_model):
         raise ('pretrain model path should be exist!')
     ckpt = torch.load(args.pretrain_model, map_location=device)
-    origin_model = import_module(f'model.{args.arch}').resnet(args.cfg).to(device)
+    origin_model = import_module(f'model.{args.arch}_cifar').resnet(args.cfg).to(device)
     origin_model.load_state_dict(ckpt['state_dict'])
 
     cfg = []
@@ -89,7 +86,7 @@ def cluster_resnet():
         if isinstance(module, ResBasicBlock):
 
             conv1_weight = module.conv1.weight.data
-            grp, centroids = cluster_weight(conv1_weight)
+            _, centroids, indices = cluster_weight(conv1_weight)
             cfg.append(len(centroids))
             centroids_state_dict[name + '.conv1.weight'] = centroids
             centroids_state_dict[name + '.conv2.weight'] = random_project(module.conv2.weight.data, len(centroids))
@@ -98,8 +95,54 @@ def cluster_resnet():
             prune_state_dict.append(name + '.bn1.running_var')
             prune_state_dict.append(name + '.bn1.running_mean')
 
-    model = import_module(f'model.{args.arch}').resnet(args.cfg, cfg).to(device)
+    model = import_module(f'model.{args.arch}_cifar').resnet(args.cfg, layer_cfg=cfg).to(device)
     get_flops_params(origin_model, model)
+    if args.init_method == 'other':
+        pass
+    elif args.init_method == 'centroids':
+        pretrain_state_dict = origin_model.state_dict()
+        state_dict = model.state_dict()
+        centroids_state_dict_keys = list(centroids_state_dict.keys())
+        for k, v in state_dict.items():
+            if k in prune_state_dict:
+                continue
+            elif k in centroids_state_dict_keys:
+                state_dict[k] = torch.FloatTensor(centroids_state_dict[k]).view_as(state_dict[k])
+            else:
+                state_dict[k] = pretrain_state_dict[k]
+        model.load_state_dict(state_dict)
+    else:
+        pass
+    return model, cfg
+
+def cluster_vgg():
+
+    if args.pretrain_model is None or not os.path.exists(args.pretrain_model):
+        raise ('pretrain model path should be exist!')
+    ckpt = torch.load(args.pretrain_model, map_location=device)
+    origin_model = import_module(f'model.{args.arch}_cifar').resnet(args.cfg).to(device)
+    origin_model.load_state_dict(ckpt['state_dict'])
+
+    cfg = []
+    centroids_state_dict = {}
+    prune_state_dict = []
+
+    for name, module in origin_model.named_modules():
+
+        if isinstance(module, nn.Conv2d):
+
+            conv1_weight = module.weight.data
+            grp, centroids = cluster_weight(conv1_weight)
+            cfg.append(len(centroids))
+            centroids_state_dict[name + '.weight'] = centroids
+            centroids_state_dict[name + '.conv2.weight'] = random_project(module.conv2.weight.data, len(centroids))
+            prune_state_dict.append(name + '.bn1.weight')
+            prune_state_dict.append(name + '.bn1.bias')
+            prune_state_dict.append(name + '.bn1.running_var')
+            prune_state_dict.append(name + '.bn1.running_mean')
+
+    model = import_module(f'model.{args.arch}').resnet(args.cfg, cfg).to(device)
+    # get_flops_params(origin_model, model)
     if args.init_method == 'other':
         pass
     elif args.init_method == 'centroids':
@@ -215,35 +258,35 @@ def main():
         raise('arch not exist!')
     print('==>Search Done!')
 
-    # if len(args.gpus) != 1:
-    #     model = nn.DataParallel(model, device_ids=args.gpus)
-    #
-    # optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-    # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lr_decay_step, gamma=0.1)
-    #
-    #
-    # for epoch in range(start_epoch, args.num_epochs):
-    #     train(model, optimizer, loader.trainLoader, args, epoch, topk=(1, 5) if args.dataset == 'imagenet' else (1, ))
-    #     scheduler.step()
-    #     test_acc = test(model, loader.testLoader, topk=(1, 5) if args.dataset == 'imagenet' else (1, ))
-    #
-    #     is_best = best_acc < test_acc
-    #     best_acc = max(best_acc, test_acc)
-    #
-    #     model_state_dict = model.module.state_dict() if len(args.gpus) > 1 else model.state_dict()
-    #
-    #     state = {
-    #         'state_dict': model_state_dict,
-    #         'best_acc': best_acc,
-    #         'optimizer': optimizer.state_dict(),
-    #         'scheduler': scheduler.state_dict(),
-    #         'epoch': epoch + 1,
-    #         'arch': args.cfg,
-    #         'cfg': cfg
-    #     }
-    #     checkpoint.save_model(state, epoch + 1, is_best)
-    #
-    # logger.info('Best accuracy: {:.3f}'.format(float(best_acc)))
+    if len(args.gpus) != 1:
+        model = nn.DataParallel(model, device_ids=args.gpus)
+
+    optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lr_decay_step, gamma=0.1)
+
+
+    for epoch in range(start_epoch, args.num_epochs):
+        train(model, optimizer, loader.trainLoader, args, epoch, topk=(1, 5) if args.dataset == 'imagenet' else (1, ))
+        scheduler.step()
+        test_acc = test(model, loader.testLoader, topk=(1, 5) if args.dataset == 'imagenet' else (1, ))
+
+        is_best = best_acc < test_acc
+        best_acc = max(best_acc, test_acc)
+
+        model_state_dict = model.module.state_dict() if len(args.gpus) > 1 else model.state_dict()
+
+        state = {
+            'state_dict': model_state_dict,
+            'best_acc': best_acc,
+            'optimizer': optimizer.state_dict(),
+            'scheduler': scheduler.state_dict(),
+            'epoch': epoch + 1,
+            'arch': args.cfg,
+            'cfg': cfg
+        }
+        checkpoint.save_model(state, epoch + 1, is_best)
+
+    logger.info('Best accuracy: {:.3f}'.format(float(best_acc)))
 
 if __name__ == '__main__':
     main()

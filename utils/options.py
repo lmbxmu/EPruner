@@ -103,4 +103,11 @@ parser.add_argument(
     help='Initital method of pruned model. default:centroids. optimal:random,centroids,other'
 )
 
+parser.add_argument(
+    '--preference_beta',
+    type=float,
+    default=0.45,
+    help='The coefficient of preference used in AffinityPropagation cluster. default:0.45'
+)
+
 args = parser.parse_args()

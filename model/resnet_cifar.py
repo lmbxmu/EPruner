@@ -48,12 +48,12 @@ class ResBasicBlock(nn.Module):
         return out
 
 class ResNet(nn.Module):
-    def __init__(self, block, num_layers, cfg=None, num_classes=10):
+    def __init__(self, block, num_layers, layer_cfg=None, num_classes=10):
         super(ResNet, self).__init__()
         assert (num_layers - 2) % 6 == 0, 'depth should be 6n+2'
         n = (num_layers - 2) // 6
 
-        self.cfg = cfg
+        self.layer_cfg = layer_cfg
         self.cfg_index = 0
         self.inplanes = 16
         self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False)
@@ -80,14 +80,14 @@ class ResNet(nn.Module):
         layers = []
 
         layers.append(block(self.inplanes, planes, filter_num=
-                    self.cfg[self.cfg_index] if self.cfg != None else planes,
+                    self.layer_cfg[self.cfg_index] if self.layer_cfg != None else planes,
                                         stride=stride))
         self.cfg_index += 1
 
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
             layers.append(block(self.inplanes, planes, filter_num=
-                    self.cfg[self.cfg_index] if self.cfg != None else planes))
+                    self.layer_cfg[self.cfg_index] if self.layer_cfg != None else planes))
             self.cfg_index += 1
 
         return nn.Sequential(*layers)
@@ -106,17 +106,17 @@ class ResNet(nn.Module):
         return x
 
 
-def resnet56(cfg=None, **kwargs):
-    return ResNet(ResBasicBlock, 56, cfg, **kwargs)
+def resnet56(layer_cfg=None, **kwargs):
+    return ResNet(ResBasicBlock, 56, layer_cfg, **kwargs)
 
-def resnet110(cfg=None, **kwargs):
-    return ResNet(ResBasicBlock, 110, cfg, **kwargs)
+def resnet110(layer_cfg=None, **kwargs):
+    return ResNet(ResBasicBlock, 110, layer_cfg, **kwargs)
 
-def resnet(arch, cfg=None, **kwargs):
+def resnet(arch, layer_cfg=None, **kwargs):
     if arch == 'resnet56':
-        return resnet56(cfg, **kwargs)
+        return resnet56(layer_cfg, **kwargs)
     elif arch == 'resnet110':
-        return resnet110(cfg, **kwargs)
+        return resnet110(layer_cfg, **kwargs)
 
 def test():
 
