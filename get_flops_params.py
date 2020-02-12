@@ -360,6 +360,8 @@ def get_flops_params(orimodel, prunemodel, dataset='cifar10'):
     print('--------------Prune Ratio--------------')
     channel_prune = ''
     for i in range(len(prunemodel.layer_cfg)):
+        if prunemodel.layer_cfg[i] == 0:
+            continue
         channel_prune = channel_prune + str(1 - prunemodel.layer_cfg[i] / ori_cfgs[args.cfg][i]) + ' '
     print('Channel Prune Ratio:' + channel_prune)
     print('Params Prune Ratio: %d/%d (%.2f%%)' % (oriparams - params, oriparams, 100.0 * (1.0 - params / oriparams)))
