@@ -8,13 +8,13 @@ We provide the pre-trained models used in our paper.
 
 ## ImageNet
 
-| [ResNet50](https://download.pytorch.org/models/resnet50-19c8e357.pth) |
+| [ResNet18](https://download.pytorch.org/models/resnet18-5c106cde.pth) | [ResNet34](https://download.pytorch.org/models/resnet34-333f7ec4.pth) | [ResNet50](https://download.pytorch.org/models/resnet50-19c8e357.pth) | [ResNet101](https://download.pytorch.org/models/resnet101-5d3b4d8f.pth) | [ResNet152](https://download.pytorch.org/models/resnet152-b121ed2d.pth) |
 
 # Running Code
 
 The code has been tested using Pytorch1.3 and CUDA10.0 on Ubuntu16.04.
 
-Sklearn 0.20.1
+Requirements: Sklearn 0.20.1
 
 
 ## APPruner
@@ -22,7 +22,7 @@ Sklearn 0.20.1
 You can run the following code to search model on CIFAR-10:
 
 ```shell
-python appruner.py 
+python appruner_cifar10.py 
 --dataset cifar10 
 --data_path ../data/cifar10/
 --pretrain_model ./experiment/pretrain/resne56.pt 
@@ -37,7 +37,23 @@ python appruner.py
 --gpus 0
 ```
 
+ You can run the following code to search model on Imagenet: 
 
+```shell
+python sketch_imagenet.py 
+--dataset imagenet 
+--data_path ../data/imagenet/
+--sketch_model ./experiment/pretrain/resne50.pth 
+--job_dir ./experiment/resnet50/
+--arch resnet 
+--cfg resnet50 
+--init_method centroids
+--preference_beta 0.45
+--lr 0.1
+--lr_decay_step 30 60
+--num_epochs 90 
+--gpus 0
+```
 
 ## Other Arguments
 
