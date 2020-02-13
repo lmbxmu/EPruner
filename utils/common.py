@@ -131,13 +131,24 @@ def cluster_weight(weight):
     cluster.fit(A)
     return cluster.labels_, cluster.cluster_centers_, cluster.cluster_centers_indices_
 
+def weight_norm(weight):
+
+    if args.weight_norm_method == 'l2':
+        norm_func = lambda x: np.sqrt(np.sum(np.power(x, 2)))
+    else:
+        norm_func = lambda x: 1.0
+
+    weight /= norm_func(weight)
+
+    return weight
+
 def random_project(weight, channel_num):
 
     A = weight.cpu().clone()
     A = A.view(A.size(0), -1)
     rp = SparseRandomProjection(n_components=channel_num * weight.size(2) * weight.size(3))
     rp.fit(A)
-    return rp.transform(A)
+    return weight_norm(rp.transform(A))
 
 def direct_project(weight, indices):
 

@@ -40,7 +40,7 @@ python appruner_cifar10.py
  You can run the following code to search model on Imagenet: 
 
 ```shell
-python sketch_imagenet.py 
+python appruner_imagenet.py 
 --dataset imagenet 
 --data_path ../data/imagenet/
 --sketch_model ./experiment/pretrain/resne50.pth 
