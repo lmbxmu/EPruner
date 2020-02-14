@@ -117,8 +117,10 @@ def get_prune_rate(sketch_rate):
     return cprate
 
 
-def cluster_weight(weight):
+def cluster_weight(weight, beta=None):
 
+    if beta is None:
+        beta = args.preference_beta
     A = weight.cpu().clone()
     if weight.dim() == 4:  #Convolution layer
         A = A.view(A.size(0), -1)
@@ -126,7 +128,7 @@ def cluster_weight(weight):
         raise('The weight dim must be 4!!!')
 
     affinity_matrix = -euclidean_distances(A, squared=True)
-    preference = np.median(affinity_matrix, axis=0) * args.preference_beta
+    preference = np.median(affinity_matrix, axis=0) * beta
     cluster = AffinityPropagation(preference=preference)
     cluster.fit(A)
     return cluster.labels_, cluster.cluster_centers_, cluster.cluster_centers_indices_

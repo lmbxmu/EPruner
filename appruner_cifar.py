@@ -81,12 +81,19 @@ def cluster_vgg():
     prune_state_dict = []
     indices = []
 
+    start_alpha_layer_index = 8
+    current_conv_layer_index = 0
+
     for name, module in origin_model.named_modules():
 
         if isinstance(module, nn.Conv2d):
 
             conv_weight = module.weight.data
-            _, centroids, indice = cluster_weight(conv_weight)
+            if current_conv_layer_index >= start_alpha_layer_index:
+                _, centroids, indice = cluster_weight(conv_weight, beta=0.92)
+            else:
+                _, centroids, indice = cluster_weight(conv_weight)
+            current_conv_layer_index += 1
             cfg.append(len(centroids))
             indices.append(indice)
             centroids_state_dict[name + '.weight'] = centroids.reshape((-1, conv_weight.size(1), conv_weight.size(2), conv_weight.size(3)))
