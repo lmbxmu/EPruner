@@ -110,11 +110,11 @@ parser.add_argument(
     help='The coefficient of preference used in AffinityPropagation cluster. default:0.45'
 )
 
-parser.add_argument(
-    '--weight_norm_method',
-    type=str,
-    default=None,
-    help='Select the weight norm method. default:None Optional:l2'
-)
+# parser.add_argument(
+#     '--weight_norm_method',
+#     type=str,
+#     default=None,
+#     help='Select the weight norm method. default:None Optional:l2'
+# )
 
 args = parser.parse_args()

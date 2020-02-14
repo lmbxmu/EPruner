@@ -90,9 +90,6 @@ optional arguments:
   --preference_beta PREFERENCE_BETA
                         The coefficient of preference used in
                         AffinityPropagation cluster. default:0.45
-  --weight_norm_method WEIGHT_NORM_METHOD
-                        Select the weight norm method. default:None
-                        Optional:l2
 ```
 
 ## Tips

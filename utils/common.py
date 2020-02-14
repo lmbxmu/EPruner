@@ -148,7 +148,8 @@ def random_project(weight, channel_num):
     A = A.view(A.size(0), -1)
     rp = SparseRandomProjection(n_components=channel_num * weight.size(2) * weight.size(3))
     rp.fit(A)
-    return weight_norm(rp.transform(A))
+    return rp.transform(A)
+    # return weight_norm(rp.transform(A))
 
 def direct_project(weight, indices):
 
