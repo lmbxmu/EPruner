@@ -1,13 +1,22 @@
 import torch
 import torch.nn as nn
+import numpy as np
+import pandas as pd
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
 from utils.options import args
 from model.resnet_cifar import ResBasicBlock
 from model.resnet_imagenet import BasicBlock, Bottleneck
 from model.googlenet import Inception
 
 import os
+import time
 from thop import profile
+import seaborn as sns
 from importlib import import_module
+from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
 from utils.common import cluster_weight, random_project, direct_project
 
 device = torch.device(f"cuda:{args.gpus[0]}") if torch.cuda.is_available() else 'cpu'
@@ -29,13 +38,15 @@ def cluster_resnet():
         if isinstance(module, ResBasicBlock):
 
             conv1_weight = module.conv1.weight.data
-            _, centroids, indices = cluster_weight(conv1_weight)
+            label, centroids, indice = cluster_weight(conv1_weight)
             cfg.append(len(centroids))
+            # plot_tsne_embedding(conv1_weight.cpu().view(conv1_weight.size(0), -1), label, indice, '', plot_name=name+'.conv1.weight')
+            plot_pca_embedding(conv1_weight.cpu().view(conv1_weight.size(0), -1), label, indice, '', plot_name=name+'.conv1.weight')
             centroids_state_dict[name + '.conv1.weight'] = centroids
             if args.init_method == 'random_project':
                 centroids_state_dict[name + '.conv2.weight'] = random_project(module.conv2.weight.data, len(centroids))
             else:
-                centroids_state_dict[name + '.conv2.weight'] = direct_project(module.conv2.weight.data, indices)
+                centroids_state_dict[name + '.conv2.weight'] = direct_project(module.conv2.weight.data, indice)
 
             prune_state_dict.append(name + '.bn1.weight')
             prune_state_dict.append(name + '.bn1.bias')
@@ -73,13 +84,21 @@ def cluster_vgg():
     prune_state_dict = []
     indices = []
 
+    start_alpha_layer_index = 8
+    current_conv_layer_index = 0
+
     for name, module in origin_model.named_modules():
 
         if isinstance(module, nn.Conv2d):
 
             conv_weight = module.weight.data
-            _, centroids, indice = cluster_weight(conv_weight)
+            if current_conv_layer_index >= start_alpha_layer_index:
+                label, centroids, indice = cluster_weight(conv_weight, beta=0.92)
+            else:
+                label, centroids, indice = cluster_weight(conv_weight)
+
             cfg.append(len(centroids))
+            # plot_tsne_embedding(conv_weight.cpu().view(conv_weight.size(0), -1), label, indice, '', plot_name=name)
             indices.append(indice)
             # indices[name + '.weight'] = indice
             centroids_state_dict[name + '.weight'] = centroids.reshape((-1, conv_weight.size(1), conv_weight.size(2), conv_weight.size(3)))
@@ -142,7 +161,8 @@ def cluster_googlenet():
         if isinstance(module, Inception):
 
             branch3_weight = module.branch3x3[0].weight.data
-            _, centroids, indice = cluster_weight(branch3_weight)
+            label, centroids, indice = cluster_weight(branch3_weight)
+            # plot_tsne_embedding(branch3_weight.cpu().view(branch3_weight.size(0), -1), label, indice, '', plot_name=name+'branch3.weight')
             cfg.append(len(centroids))
             centroids_state_dict[name + '.branch3x3.0.weight'] = centroids
             if args.init_method == 'random_project':
@@ -157,8 +177,9 @@ def cluster_googlenet():
             prune_state_dict.append(name + '.branch3x3.1.running_mean')
 
             branch5_weight1 = module.branch5x5[0].weight.data
-            _, centroids, indice = cluster_weight(branch5_weight1)
+            label, centroids, indice = cluster_weight(branch5_weight1)
             cfg.append(len(centroids))
+            # plot_tsne_embedding(branch5_weight1.cpu().view(branch5_weight1.size(0), -1), label, indice, '', plot_name=name+'branch5.weight1')
             indices.append(indice)
             centroids_state_dict[name + '.branch5x5.0.weight'] = centroids
 
@@ -170,6 +191,7 @@ def cluster_googlenet():
 
             branch5_weight2 = module.branch5x5[3].weight.data
             _, centroids, indice = cluster_weight(branch5_weight2)
+            # plot_tsne_embedding(branch5_weight2.cpu().view(branch5_weight2.size(0), -1), label, indice, '', plot_name=name+'branch5.weight2')
             cfg.append(len(centroids))
             centroids_state_dict[name + '.branch5x5.3.weight'] = centroids.reshape((-1, branch5_weight2.size(1), branch5_weight2.size(2), branch5_weight2.size(3)))
 
@@ -231,7 +253,8 @@ def cluster_resnet_imagenet():
         if isinstance(module, BasicBlock):
 
             conv1_weight = module.conv1.weight.data
-            _, centroids, indice = cluster_weight(conv1_weight)
+            label, centroids, indice = cluster_weight(conv1_weight)
+            # plot_tsne_embedding(conv1_weight.cpu().view(conv1_weight.size(0), -1), label, indice, '', plot_name=name+'.conv1.weight')
             cfg.append(len(centroids))
             cfg.append(0)  # assume baseblock has three conv layer
             centroids_state_dict[name + '.conv1.weight'] = centroids
@@ -248,8 +271,9 @@ def cluster_resnet_imagenet():
         elif isinstance(module, Bottleneck):
 
             conv1_weight = module.conv1.weight.data
-            _, centroids, indice = cluster_weight(conv1_weight)
+            label, centroids, indice = cluster_weight(conv1_weight)
             cfg.append(len(centroids))
+            # plot_tsne_embedding(conv1_weight.cpu().view(conv1_weight.size(0), -1), label, indice, '', plot_name=name+'.conv1.weight')
             indices.append(indice)
             centroids_state_dict[name + '.conv1.weight'] = centroids
 
@@ -259,8 +283,9 @@ def cluster_resnet_imagenet():
             prune_state_dict.append(name + '.bn1.running_mean')
 
             conv2_weight = module.conv2.weight.data
-            _, centroids, indice = cluster_weight(conv2_weight)
+            label, centroids, indice = cluster_weight(conv2_weight)
             cfg.append(len(centroids))
+            # plot_tsne_embedding(conv2_weight.cpu().view(conv2_weight.size(0), -1), label, indice, '', plot_name=name+'.conv2.weight')
             centroids_state_dict[name + '.conv2.weight'] = centroids.reshape(
                 (-1, conv2_weight.size(1), conv2_weight.size(2), conv2_weight.size(3)))
 
@@ -366,6 +391,132 @@ def get_flops_params(orimodel, prunemodel, dataset='cifar10'):
     print('Channel Prune Ratio:' + channel_prune)
     print('Params Prune Ratio: %d/%d (%.2f%%)' % (oriparams - params, oriparams, 100.0 * (1.0 - params / oriparams)))
     print('FLOPS Prune Ratio: %d/%d (%.2f%%)' % (oriflops - flops, oriflops, 100. * (1.0 - flops / oriflops)))
+
+def get_color_set(color_num):
+
+    colors = ['r', 'g', 'b', 'k', 'c', 'm', 'y']
+
+    if len(colors) < color_num:
+
+        times = color_num - len(colors)
+        for i in range(times):
+            colors.append(plt.cm.Set1(i / 10.))
+    return colors
+
+def plot_tsne_embedding(data, label, indices, title, plot_name):
+
+    t_sne = TSNE(n_components=2)
+    data = t_sne.fit(X=data, y=label).fit_transform(data)
+    # t_sne.fit_transform(data, label)
+    # data = t_sne.fit_transform(data)
+    # x_min, x_max = np.min(data, 0), np.max(data, 0)
+    # data = (data - x_min) / (x_max - x_min)
+
+    plt.figure()
+
+    centroids = []
+    for i in range(data.shape[0]):
+        if i in indices:
+            centroids.append('centroid')
+        else:
+            centroids.append('other')
+    # print(label)
+    tips = {
+        'x': data[:, 0],
+        'y': data[:, 1],
+        'label': label,
+        'centroids': centroids
+    }
+    cmap = {}
+    palette = sns.color_palette("Set2", 8) + \
+              sns.color_palette("Paired", 12) + \
+              sns.color_palette("hls", 8) + \
+              sns.color_palette("husl", 8) + \
+              sns.color_palette() + \
+              sns.color_palette("Set1", 8) + \
+              sns.color_palette("Set3", 8)
+    for i in range(len(palette)):
+        cmap[i] = palette[i]
+    # sns.set_palette(palette)
+    # print(palette)
+    # sns.color_palette(palette)
+    # sns.palplot(palette)
+
+    frame = pd.DataFrame(tips)
+    ax = sns.scatterplot(x='x', y='y', hue='label', size='centroids', sizes=(100,200),
+                         size_order=['centroid', 'other'],
+                          palette=cmap, data=frame, legend=False)
+    # handles, labels = ax.get_legend_handles_labels()
+    # ax.legend(handles=handles[-2:], labels=labels[-2:])
+
+    # ax = sns.scatterplot(x='x', y='y', hue='label', size='centroids',
+    #                      palette='Set2', data=frame)
+
+    plt.axes = ax
+    plt.title(title)
+
+    output_path = './tsne_plot/' + args.cfg
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+    plt.savefig(os.path.join(output_path, plot_name + '.png'))
+    plt.close()
+
+def plot_pca_embedding(data, label, indices, title, plot_name):
+
+    # x_min, x_max = np.min(data, 0), np.max(data, 0)
+    # data = (data - x_min) / (x_max - x_min)
+    pca = PCA(n_components=2)
+    data = pca.fit(X=data, y=label).transform(data)
+
+    plt.figure()
+
+    centroids = []
+    for i in range(data.shape[0]):
+        if i in indices:
+            centroids.append('centroid')
+        else:
+            centroids.append('other')
+    # print(label)
+    tips = {
+        'x': data[:, 0],
+        'y': data[:, 1],
+        'label': label,
+        'centroids': centroids
+    }
+    cmap = {}
+    palette = sns.color_palette("Set2", 8) + \
+              sns.color_palette("Paired", 12) + \
+              sns.color_palette("hls", 8) + \
+              sns.color_palette("husl", 8) + \
+              sns.color_palette() + \
+              sns.color_palette("Set1", 8) + \
+              sns.color_palette("Set3", 8)
+    for i in range(len(palette)):
+        cmap[i] = palette[i]
+    # sns.set_palette(palette)
+    # print(palette)
+    # sns.color_palette(palette)
+    # sns.palplot(palette)
+
+    frame = pd.DataFrame(tips)
+    ax = sns.scatterplot(x='x', y='y', hue='label', size='centroids', sizes=(100,200),
+                         size_order=['centroid', 'other'],
+                          palette=cmap, data=frame, legend=False)
+    # handles, labels = ax.get_legend_handles_labels()
+    # ax.legend(handles=handles[-2:], labels=labels[-2:])
+
+    # ax = sns.scatterplot(x='x', y='y', hue='label', size='centroids',
+    #                      palette='Set2', data=frame)
+
+    plt.axes = ax
+    plt.title(title)
+
+    output_path = './pca_plot/' + args.cfg
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+    plt.savefig(os.path.join(output_path, plot_name + '.png'))
+    plt.close()
+
 
 def main():
 
