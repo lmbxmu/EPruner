@@ -41,12 +41,26 @@ def cluster_resnet():
     prune_state_dict = []
     indices = []
 
+    block_num_betas = {
+        'resnet18': (6, 0.86),
+        'resnet34': (14, 0.92),
+        'resnet50': (13, 0.85),
+        'resnet101': (28, 0.92),
+        'resnet152': (45, 0.92)
+    }
+
+    current_conv_layer_index = 0
+
     for name, module in origin_model.named_modules():
 
         if isinstance(module, BasicBlock):
 
             conv1_weight = module.conv1.weight.data
-            _, centroids, indice = cluster_weight(conv1_weight)
+            if current_conv_layer_index >= block_num_betas[args.cfg][0]:
+                _, centroids, indice = cluster_weight(conv1_weight, block_num_betas[args.cfg][1])
+            else:
+                _, centroids, indice = cluster_weight(conv1_weight, args.preference_beta)
+            current_conv_layer_index += 1
             cfg.append(len(centroids))
             cfg.append(0) #assume baseblock has three conv layer
             centroids_state_dict[name + '.conv1.weight'] = centroids
@@ -63,7 +77,10 @@ def cluster_resnet():
         elif isinstance(module, Bottleneck):
 
             conv1_weight = module.conv1.weight.data
-            _, centroids, indice = cluster_weight(conv1_weight)
+            if current_conv_layer_index >= block_num_betas[args.cfg][0]:
+                _, centroids, indice = cluster_weight(conv1_weight, block_num_betas[args.cfg][1])
+            else:
+                _, centroids, indice = cluster_weight(conv1_weight, args.preference_beta)
             cfg.append(len(centroids))
             indices.append(indice)
             centroids_state_dict[name + '.conv1.weight'] = centroids
@@ -74,7 +91,11 @@ def cluster_resnet():
             prune_state_dict.append(name + '.bn1.running_mean')
 
             conv2_weight = module.conv2.weight.data
-            _, centroids, indice = cluster_weight(conv2_weight)
+            if current_conv_layer_index >= block_num_betas[args.cfg][0]:
+                _, centroids, indice = cluster_weight(conv2_weight, block_num_betas[args.cfg][1])
+            else:
+                _, centroids, indice = cluster_weight(conv2_weight, args.preference_beta)
+            current_conv_layer_index += 1
             cfg.append(len(centroids))
             centroids_state_dict[name + '.conv2.weight'] = centroids.reshape((-1, conv2_weight.size(1), conv2_weight.size(2), conv2_weight.size(3)))
 

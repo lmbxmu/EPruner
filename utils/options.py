@@ -1,6 +1,6 @@
 import argparse
 
-parser = argparse.ArgumentParser(description='APPruner')
+parser = argparse.ArgumentParser(description='EPruner')
 
 parser.add_argument(
     '--gpus',
@@ -53,8 +53,8 @@ parser.add_argument(
 parser.add_argument(
     '--train_batch_size',
     type=int,
-    default=128,
-    help='Batch size for training. default:128')
+    default=256,
+    help='Batch size for training. default:256')
 
 parser.add_argument(
     '--eval_batch_size',
@@ -106,15 +106,8 @@ parser.add_argument(
 parser.add_argument(
     '--preference_beta',
     type=float,
-    default=0.45,
+    default=0.8,
     help='The coefficient of preference used in AffinityPropagation cluster. default:0.45'
 )
-
-# parser.add_argument(
-#     '--weight_norm_method',
-#     type=str,
-#     default=None,
-#     help='Select the weight norm method. default:None Optional:l2'
-# )
 
 args = parser.parse_args()

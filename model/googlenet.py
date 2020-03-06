@@ -248,15 +248,3 @@ class GoogLeNet(nn.Module):
 
 def googlenet(layer_cfg=None):
     return GoogLeNet(block=Inception, layer_cfg=layer_cfg)
-
-def test():
-
-
-    model = googlenet()
-    ckpt = torch.load('../pretrain/googlenet.pt', map_location='cpu')
-    model.load_state_dict(ckpt['state_dict'])
-
-    print(model)
-    # print(model(torch.randn(1, 3, 32, 32)))
-
-# test()

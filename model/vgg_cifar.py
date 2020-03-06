@@ -54,20 +54,3 @@ class VGG(nn.Module):
             elif isinstance(m, nn.Linear):
                 nn.init.normal_(m.weight, 0, 0.01)
                 nn.init.constant_(m.bias, 0)
-
-def test():
-
-    model = VGG('vgg16')
-    ckpt = torch.load('../pretrain/vgg16_cifar10.pt', map_location='cpu')
-    model.load_state_dict(ckpt['state_dict'])
-
-    # print(model)
-    for name, module in model.named_modules():
-
-        if isinstance(module, nn.Conv2d):
-
-            print(module.weight.size(1)*module.weight.size(2)*module.weight.size(3))
-
-
-
-# test()

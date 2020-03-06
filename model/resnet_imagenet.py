@@ -236,14 +236,3 @@ def ResNet101():
 
 def ResNet152():
     return ResNet(Bottleneck, [3,8,36,3])
-
-def test():
-
-    model =ResNet152()
-    # ckpt = torch.load('../pretrain/resnet50.pth', map_location='cpu')
-    # model.load_state_dict(ckpt)
-    x = torch.randn(1, 3, 224, 224)
-    y = model(x)
-    print(y.size())
-
-# test()

@@ -117,13 +117,3 @@ def resnet(arch, layer_cfg=None, **kwargs):
         return resnet56(layer_cfg, **kwargs)
     elif arch == 'resnet110':
         return resnet110(layer_cfg, **kwargs)
-
-def test():
-
-    model = resnet56()
-    # ckpt = torch.load('../pretrain/resnet56.pt', map_location='cpu')
-    # model.load_state_dict(ckpt['state_dict'])
-    #
-    # print(model)
-
-# test()

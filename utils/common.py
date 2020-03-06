@@ -58,7 +58,7 @@ class checkpoint():
             f.write('\n')
 
     def save_model(self, state, epoch, is_best):
-        save_path = f'{self.ckpt_dir}/model_{epoch}.pt'
+        save_path = f'{self.ckpt_dir}/model_last.pt'
         torch.save(state, save_path)
         if is_best:
             shutil.copyfile(save_path, f'{self.ckpt_dir}/model_best.pt')
@@ -96,26 +96,6 @@ def accuracy(output, target, topk=(1,)):
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
 
-def get_prune_rate(sketch_rate):
-    import re
-
-    cprate_str = sketch_rate
-    cprate_str_list = cprate_str.split('+')
-    pat_cprate = re.compile(r'\d+\.\d*')
-    pat_num = re.compile(r'\*\d+')
-    cprate = []
-    for x in cprate_str_list:
-        num = 1
-        find_num = re.findall(pat_num, x)
-        if find_num:
-            assert len(find_num) == 1
-            num = int(find_num[0].replace('*', ''))
-        find_cprate = re.findall(pat_cprate, x)
-        assert len(find_cprate) == 1
-        cprate += [float(find_cprate[0])] * num
-
-    return cprate
-
 
 def cluster_weight(weight, beta=None):
 
@@ -133,16 +113,6 @@ def cluster_weight(weight, beta=None):
     cluster.fit(A)
     return cluster.labels_, cluster.cluster_centers_, cluster.cluster_centers_indices_
 
-def weight_norm(weight):
-
-    if args.weight_norm_method == 'l2':
-        norm_func = lambda x: np.sqrt(np.sum(np.power(x, 2)))
-    else:
-        norm_func = lambda x: 1.0
-
-    weight /= norm_func(weight)
-
-    return weight
 
 def random_project(weight, channel_num):
 
@@ -151,7 +121,6 @@ def random_project(weight, channel_num):
     rp = SparseRandomProjection(n_components=channel_num * weight.size(2) * weight.size(3))
     rp.fit(A)
     return rp.transform(A)
-    # return weight_norm(rp.transform(A))
 
 def direct_project(weight, indices):
 
