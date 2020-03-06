@@ -150,6 +150,7 @@ def test(model, topk=(1,)):
 
 def main():
 
+
     if args.pruned_model is None or not os.path.exists(args.pruned_model):
         raise ('Pruned Model path must be exist!')
     # Model
