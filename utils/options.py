@@ -20,8 +20,8 @@ parser.add_argument(
 parser.add_argument(
     '--data_path',
     type=str,
-    default='/home/lishaojie/data/cifar10/',
-    help='The dictionary where the input is stored. default:/home/lishaojie/data/cifar10/',
+    default='/data/cifar10/',
+    help='The dictionary where the input is stored. default:/data/cifar10/',
 )
 
 parser.add_argument(

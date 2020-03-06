@@ -46,18 +46,18 @@ We provide the pre-trained models used in our paper.
 | ResNet34  |      0.75       |   centroids    |   1853.92M(49.61%)    |     10.24M(53.24%)     |      70.95%       |      89.97%       | [Link](https://drive.google.com/open?id=1s6edp4ec4YQ74TbONd0pI0mF4L99Cz0r) |
 | ResNet34  |      0.75       |     random     |   1853.92M(49.61%)    |     10.24M(53.24%)     |      70.71%       |      89.78%       | [Link](https://drive.google.com/open?id=1M8ztRs9jqoxmuHCjPpcFVLgZO3bDdwwQ) |
 | ResNet34  |      0.75       | random_project |   1853.92M(49.61%)    |     10.24M(53.24%)     |      70.79%       |      89.91%       | [Link](https://drive.google.com/open?id=1HroILecs0UJE0xMbQtbUfdL2QfOPdpCB) |
-| ResNet50  |       0.7       |   centroids    |   1929.15M(53.35%)    |     12.70M(50.31%)     |      74.26%       |      91.88%       | [Link](https://drive.google.com/open?id=1Swng8R9f27M0BXvD4jPwbaiHWRHsXWkO) |
-| ResNet50  |       0.7       |     random     |   1929.15M(53.35%)    |     12.70M(50.31%)     |      73.54%       |      91.55%       | [Link](https://drive.google.com/open?id=1znuCEAMv2tOzXgNkdQpZAziz5P8kK31d) |
-| ResNet50  |       0.7       | random_project |   1929.15M(53.35%)    |     12.70M(50.31%)     |      73.80%       |      91.83%       | [Link](https://drive.google.com/open?id=1igC-56Cw4Q9q4RUmLwlGsw1EkzsK8UWl) |
-| ResNet50  |      0.71       |   centroids    |   2366.80M(42.77%)    |     21.98M(13.99%)     |      74.95%       |      92.36%       | [Link](https://drive.google.com/open?id=1WxCaVliGiHJANqiH-lLt4DPvhjmzPt-e) |
-| ResNet50  |      0.81       |   centroids    |   1290.35M(68.63%)    |     14.78M(42.15%)     |      72.73%       |      91.01%       | [Link](https://drive.google.com/open?id=1ZvmqG8k6-APJJNq1SMHz0lertgB6Ht19) |
-| ResNet50  |      0.85       |   centroids    |    905.89M(78.10%)    |     8.65M(66.15%)      |      70.34%       |      89.45%       | [Link](https://drive.google.com/open?id=1nVOYAWsJGbxwb4fNXIlDcWWwNEBNCPC5) |
+| ResNet50  |      0.73       |   centroids    |   1929.15M(53.35%)    |     12.70M(50.31%)     |      74.26%       |      91.88%       | [Link](https://drive.google.com/open?id=1Swng8R9f27M0BXvD4jPwbaiHWRHsXWkO) |
+| ResNet50  |      0.73       |     random     |   1929.15M(53.35%)    |     12.70M(50.31%)     |      73.54%       |      91.55%       | [Link](https://drive.google.com/open?id=1znuCEAMv2tOzXgNkdQpZAziz5P8kK31d) |
+| ResNet50  |      0.73       | random_project |   1929.15M(53.35%)    |     12.70M(50.31%)     |      73.80%       |      91.83%       | [Link](https://drive.google.com/open?id=1igC-56Cw4Q9q4RUmLwlGsw1EkzsK8UWl) |
 | ResNet101 |      0.67       |   centroids    |   2817.27M(64.20%)    |     15.55M(65.10%)     |      75.45%       |      92.70%       | [Link](https://drive.google.com/open?id=1DJuB_hoxc38UA8WkMeA5cHL3wjxelmHo) |
 | ResNet101 |      0.67       |     random     |   2817.27M(64.20%)    |     15.55M(65.10%)     |      75.15%       |      92.25%       | [Link](https://drive.google.com/open?id=1LfUpJcc3rclO73LVuB5XI_UcCuvZ8-1S) |
 | ResNet101 |      0.67       | random_project |   2817.27M(64.20%)    |     15.55M(65.10%)     |      75.31%       |      92.50%       | [Link](https://drive.google.com/open?id=1JLfdzTBlcFrfGAQ59q8ccHGbdAhlG4g_) |
 | ResNet152 |      0.63       |   centroids    |   4047.69M(65.12%)    |     21.56M(64.18%)     |      76.51%       |      93.22%       | [Link](https://drive.google.com/open?id=1FgOJHocaIujKgsrEx63Vg-h1gD3cr9sD) |
 | ResNet152 |      0.63       |     random     |   4047.69M(65.12%)    |     21.56M(64.18%)     |      76.15%       |      92.97%       | [Link](https://drive.google.com/open?id=1rjgkEAF19CeCQdt298rhmoL6GsQzISXw) |
 | ResNet152 |      0.63       | random_project |   4047.69M(65.12%)    |     21.56M(64.18%)     |      76.43%       |      93.14%       | [Link](https://drive.google.com/open?id=1oIsDp28cdZOXLg-A_IIagQ5Nfly4cnEP) |
+| ResNet50  |      0.71       |   centroids    |   2366.80M(42.77%)    |     21.98M(13.99%)     |      74.95%       |         -         | [Link](https://drive.google.com/open?id=1WxCaVliGiHJANqiH-lLt4DPvhjmzPt-e) |
+| ResNet50  |      0.81       |   centroids    |   1290.35M(68.63%)    |     14.78M(42.15%)     |      72.73%       |         -         | [Link](https://drive.google.com/open?id=1ZvmqG8k6-APJJNq1SMHz0lertgB6Ht19) |
+| ResNet50  |      0.85       |   centroids    |    905.89M(78.10%)    |     8.65M(66.15%)      |      70.34%       |         -         | [Link](https://drive.google.com/open?id=1nVOYAWsJGbxwb4fNXIlDcWWwNEBNCPC5) |
 
 # Running Code
 
