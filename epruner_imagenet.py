@@ -78,7 +78,7 @@ def cluster_resnet():
 
             conv1_weight = module.conv1.weight.data
             if current_conv_layer_index >= block_num_betas[args.cfg][0]:
-                _, centroids, indice = cluster_weight(conv1_weight, block_num_betas[args.cfg][1])
+                _, centroids, indice = cluster_weight(conv1_weight, block_num_betas[args.cfg][1] if args.cfg == 'resnet50' and args.beta==0.7 else None)
             else:
                 _, centroids, indice = cluster_weight(conv1_weight, args.preference_beta)
             cfg.append(len(centroids))
