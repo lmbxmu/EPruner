@@ -106,8 +106,8 @@ parser.add_argument(
 parser.add_argument(
     '--preference_beta',
     type=float,
-    default=0.8,
-    help='The coefficient of preference used in AffinityPropagation cluster. default:0.45'
+    default=0.75,
+    help='The coefficient of preference used in AffinityPropagation cluster. default:0.75'
 )
 
 args = parser.parse_args()

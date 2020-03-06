@@ -46,6 +46,13 @@ parser.add_argument(
     default=100,
     help='Batch size for validation. default:100'
 )
+parser.add_argument(
+    '--gpus',
+    type=int,
+    nargs='+',
+    default=[0],
+    help='Select gpu_id to use. default:[0]',
+)
 args = parser.parse_args()
 
 device = torch.device(f"cuda:{args.gpus[0]}") if torch.cuda.is_available() else 'cpu'
