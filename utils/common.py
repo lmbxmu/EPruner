@@ -122,6 +122,7 @@ def random_project(weight, channel_num):
     rp.fit(A)
     return rp.transform(A)
 
+
 def direct_project(weight, indices):
 
     A = torch.randn(weight.size(0), len(indices), weight.size(2), weight.size(3))
