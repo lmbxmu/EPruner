@@ -1,4 +1,3 @@
-import time
 import torch.utils.data
 import nvidia.dali.ops as ops
 import nvidia.dali.types as types
@@ -6,14 +5,19 @@ import torchvision.datasets as datasets
 from nvidia.dali.pipeline import Pipeline
 import torchvision.transforms as transforms
 from nvidia.dali.plugin.pytorch import DALIClassificationIterator, DALIGenericIterator
+import cupy as cp
 
 
 class HybridTrainPipe(Pipeline):
     def __init__(self, batch_size, num_threads, device_id, data_dir, crop, dali_cpu=False, local_rank=0, world_size=1):
-        super(HybridTrainPipe, self).__init__(batch_size, num_threads, device_id, seed=12 + device_id)
+        super(HybridTrainPipe, self).__init__(batch_size, num_threads, device_id, seed=12 + device_id, exec_async=False, exec_pipelined=False)
         dali_device = "gpu"
+        self.pca_lighting = Lighting(alphastd=0.1)
         self.input = ops.FileReader(file_root=data_dir, shard_id=local_rank, num_shards=world_size, random_shuffle=True)
         self.decode = ops.ImageDecoder(device="mixed", output_type=types.RGB)
+        # self.lighting = ops.PythonFunction(function=lighting, device="gpu")
+        self.lighting = ops.PythonFunction(device="gpu", function=self.pca_lighting)
+        self.jitter = ops.ColorTwist(device="gpu", brightness=0.4, contrast=0.4, saturation=0.4, hue=0.0)
         self.res = ops.RandomResizedCrop(device="gpu", size=crop, random_area=[0.08, 1.25])
         self.cmnp = ops.CropMirrorNormalize(device="gpu",
                                             output_dtype=types.FLOAT,
@@ -22,18 +26,21 @@ class HybridTrainPipe(Pipeline):
                                             mean=[0.485 * 255, 0.456 * 255, 0.406 * 255],
                                             std=[0.229 * 255, 0.224 * 255, 0.225 * 255])
         self.coin = ops.CoinFlip(probability=0.5)
+
         print('DALI "{0}" variant'.format(dali_device))
 
     def define_graph(self):
         rng = self.coin()
         self.jpegs, self.labels = self.input(name="Reader")
         images = self.decode(self.jpegs)
+        images = self.lighting(images)
+        images = self.jitter(images)
         images = self.res(images)
         output = self.cmnp(images, mirror=rng)
         return [output, self.labels]
 
-
 class HybridValPipe(Pipeline):
+
     def __init__(self, batch_size, num_threads, device_id, data_dir, crop, size, local_rank=0, world_size=1):
         super(HybridValPipe, self).__init__(batch_size, num_threads, device_id, seed=12 + device_id)
         self.input = ops.FileReader(file_root=data_dir, shard_id=local_rank, num_shards=world_size,
@@ -79,7 +86,11 @@ def get_imagenet_iter_torch(type, image_dir, batch_size, num_threads, device_id,
                             world_size=1, local_rank=0):
     if type == 'train':
         transform = transforms.Compose([
-            transforms.RandomResizedCrop(crop, scale=(0.08, 1.25)),
+            transforms.RandomResizedCrop(crop, scale=(0.08, 1.0)),
+            transforms.ColorJitter(
+                brightness=0.4, contrast=0.4,
+                saturation=0.4),
+            Lighting(0.1),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
@@ -100,25 +111,46 @@ def get_imagenet_iter_torch(type, image_dir, batch_size, num_threads, device_id,
     return dataloader
 
 
-if __name__ == '__main__':
-    train_loader = get_imagenet_iter_dali(type='train', image_dir='/userhome/memory_data/imagenet', batch_size=256,
-                                          num_threads=4, crop=224, device_id=0, num_gpus=1)
-    print('start iterate')
-    start = time.time()
-    for i, data in enumerate(train_loader):
-        images = data[0]["data"].cuda(non_blocking=True)
-        labels = data[0]["label"].squeeze().long().cuda(non_blocking=True)
-    end = time.time()
-    print('end iterate')
-    print('dali iterate time: %fs' % (end - start))
+class Lighting(object):
 
-    train_loader = get_imagenet_iter_torch(type='train', image_dir='/userhome/data/imagenet', batch_size=256,
-                                           num_threads=4, crop=224, device_id=0, num_gpus=1)
-    print('start iterate')
-    start = time.time()
-    for i, data in enumerate(train_loader):
-        images = data[0].cuda(non_blocking=True)
-        labels = data[1].cuda(non_blocking=True)
-    end = time.time()
-    print('end iterate')
-    print('torch iterate time: %fs' % (end - start))
+    def __init__(self, alphastd):
+        self.alphastd= alphastd
+        self.eigval = cp.asarray([0.2175, 0.0188, 0.0045])
+        self.eigvec = cp.asarray([
+            [-0.5675, 0.7192, 0.4009],
+            [-0.5808, -0.0045, -0.8140],
+            [-0.5836, -0.6948, 0.4203],
+        ])
+
+    def __call__(self, img):
+        rnd = cp.random.randn(3) * 0.1
+        rnd = rnd.astype('float32')
+        v = rnd
+        old_dtype = img.dtype
+        v = v * self.eigval
+        v = v.reshape((3, 1))
+        inc = cp.dot(self.eigvec, v).reshape((3,))
+        img = cp.add(img, inc)
+        if old_dtype == cp.uint8:
+            img = cp.clip(img, 0, 255)
+        return img.astype(old_dtype)
+
+# def lighting(img):
+#
+#     eigval = cp.asarray([0.2175, 0.0188, 0.0045])
+#     eigvec = cp.asarray([
+#                     [-0.5675, 0.7192, 0.4009],
+#                     [-0.5808, -0.0045, -0.8140],
+#                     [-0.5836, -0.6948, 0.4203],
+#                 ])
+#     rnd = cp.random.randn(3) * 0.1
+#     rnd = rnd.astype('float32')
+#     v = rnd
+#     old_dtype = cp.asarray(img).dtype
+#     v = v * eigval
+#     v = v.reshape((3, 1))
+#     inc = cp.dot(eigvec, v).reshape((3,))
+#     img = cp.add(img, inc)
+#     if old_dtype == cp.uint8:
+#         img = cp.clip(img, 0, 255)
+#     return img.astype(old_dtype)
