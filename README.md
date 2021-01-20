@@ -1,4 +1,4 @@
-# Non-Parametric Adaptive Network Pruning
+# Non-Parametric Adaptive Network Pruning ![]( https://visitor-badge.glitch.me/badge?page_id=lmbxmu.epruner).
 
 <div align=center><img src="img/framework.png" height = "50%" width = "60%"/></div>
 
