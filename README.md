@@ -1,12 +1,11 @@
 # Non-Parametric Adaptive Network Pruning
 
 <div align=center><img src="img/framework.png" height = "50%" width = "60%"/></div>
-Framework of EPruner. The similarity graph among ﬁlters is constructed. The “responsibility” r(A, B) indicates the suitedness of ﬁlter B to the exemplar of ﬁlter A. The “availability” a(A, B) reﬂects the appropriatedness of ﬁlter A choosing ﬁlter B as its exemplar. The two messages are passing among ﬁlters until examplars merges, which then serve as the preserved ﬁlters. 
 
 
 ## Tips
 
-Any problem, free to contact the authors via emails: lmbxmu@stu.xmu.edu.cn or shaojieli@stu.xmu.edu.cn, or adding the first author's wechat as friends (id: lmbcxy if you are using wechat) for convenient communications. Do not post issues with github as much as possible, just in case that I could not receive the emails from github thus ignore the posted issues.
+Any problem, please contact the first author (Email: lmbxmu@stu.xmu.edu.cn, or WeChat: linmb007 if you are using it) or the third author (Email: shaojieli@stu.xmu.edu.cn). Also, you can post issues with github, but sometimes we could not receive github emails thus may ignore the posted issues (sorry if it happens).
 
 
 # Pre-trained Models
