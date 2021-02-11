@@ -5,7 +5,7 @@
 
 ## Tips
 
-Any problem, please contact the first author (Email: lmbxmu@stu.xmu.edu.cn, or WeChat: linmb007 if you are using it) or the third author (Email: shaojieli@stu.xmu.edu.cn). Also, you can post issues with github, but sometimes we could not receive github emails thus may ignore the posted issues (sorry if it happens).
+Any problem, please contact the first author (Email: lmbxmu@stu.xmu.edu.cn) or the third author (Email: shaojieli@stu.xmu.edu.cn). Also, you can post issues with github, but sometimes we could not receive github emails thus may ignore the posted issues (sorry if it happens).
 
 
 # Pre-trained Models
